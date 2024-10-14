@@ -1,15 +1,26 @@
+# Made by Mehul Ambastha
 from flask import Flask, request, jsonify
 import os
 from github import Github
 from github import GithubIntegration
-import jwt
 from dotenv import load_dotenv
 from groq import Groq
+from functools import wraps
+import threading
 import time
+from database import has_already_commented, insert_comment_record
 
 load_dotenv()
 
 app = Flask(__name__)
+
+pr_locks = {}
+
+
+def get_pr_lock(repo_name, pr_number):
+    lock_key = f"{repo_name}:{pr_number}"
+    return pr_locks.setdefault(lock_key, threading.Lock())
+
 
 # Github configuration
 GITHUB_APP_ID = os.getenv('GITHUB_APP_ID')
@@ -29,8 +40,22 @@ def webhook():
         payload = request.json
 
         if payload['action'] == 'opened':
-            print('Processing payload.')
-            process_payload(payload)
+            pr_number = payload['number']
+            repo_name = payload['repository']['full_name']
+
+            pr_lock = get_pr_lock(repo_name, pr_number)
+
+            def process_with_lock():
+                with pr_lock:
+                    print('Processing payload.')
+                    if not has_already_commented(repo_name, pr_number):
+                        process_payload(payload)
+                    else:
+                        print(f'Already commented on PR #{
+                              pr_number} in {repo_name}. Skipping...')
+
+            # Start a new thread to process the payload
+            threading.Thread(target=process_with_lock).start()
 
     return jsonify({'status': 'success'}), 200
 
@@ -63,6 +88,7 @@ instance = generate_github_bot_instance()
 def process_payload(payload):
     pr_number = payload['number']
     repo_name = payload['repository']['full_name']
+
     pr_content = get_pr_content(repo_name, pr_number)
     # Generating the Analysis
 
@@ -73,6 +99,8 @@ def process_payload(payload):
 
     print('Posting comment...')
     post_pr_comment(repo_name, pr_number, analysis)
+
+    insert_comment_record(repo_name, pr_number)
     print('Commented.')
 
 
