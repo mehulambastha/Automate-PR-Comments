@@ -2,6 +2,10 @@
 
 This project automates the process of reviewing code changes in pull requests on GitHub using a Flask web server, GitHub's API, Groq AI for analysis, and TinyDB as a local database. The bot listens for pull request events, generates feedback based on the PR's contents, and posts a comment on the pull request.
 
+---
+### [Link](https://github.com/mehulambastha/AutoPR-Reviewer-Bot-Install) to Frontend for installing the bot on your repos.
+---
+
 ## Features
 - Automatically comments on new pull requests with an AI-generated code review.
 - Uses threading and locking mechanisms to prevent race conditions.
